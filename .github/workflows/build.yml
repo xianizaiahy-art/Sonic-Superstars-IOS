@@ -37,30 +37,29 @@ jobs:
           "$RUNNER_TEMP/nx-venv/bin/python" -m pip install --upgrade pip
           "$RUNNER_TEMP/nx-venv/bin/python" -m pip install lz4 "capstone>=5,<6" fonttools nsz zbic backports.zstd
 
-      # Supply your own legally obtained game dump and keys as GitHub Actions secrets.
-      # This workflow does not fetch game files from third-party file-sharing links.
+      # Supply your own legally obtained game dump and keys through private GitHub Actions secrets.
+      # Do not use third-party file-sharing links for game files or keys.
       - name: Prepare Sonic Superstars game files
         env:
-          BASE_URL: ${{ secrets.SONIC_BASE_NSP_URL }}
-          UPDATE_URL: ${{ secrets.SONIC_UPDATE_NSP_URL }}
-          PROD_KEYS: ${{ secrets.PROD_KEYS }}
+          BASE_URL: ${{ secrets.GAME_URL }}
+          UPDATE_URL: ${{ secrets.UPDATE_URL }}
+          KEYS_URL: ${{ secrets.KEYS_URL }}
         run: |
           set -euo pipefail
           GAME_DIR="$RUNNER_TEMP/sonic-superstars"
           mkdir -p "$GAME_DIR"
 
-          for name in BASE_URL UPDATE_URL PROD_KEYS; do
+          for name in BASE_URL UPDATE_URL KEYS_URL; do
             test -n "${!name}" || {
               echo "Missing required secret: $name"
               exit 1
             }
           done
 
-          # URLs should point to files you are legally entitled to use.
-          curl --fail --location --retry 3 "$BASE_URL"             --output "$GAME_DIR/Sonic_Superstars_Base.nsp"
-          curl --fail --location --retry 3 "$UPDATE_URL"             --output "$GAME_DIR/Sonic_Superstars_Update.nsp"
-
-          printf '%s' "$PROD_KEYS" > "$RUNNER_TEMP/prod.keys"
+          # These URLs must point to files you own and are legally entitled to use.
+          curl --fail --location --retry 3 "$BASE_URL" --output "$GAME_DIR/Sonic_Superstars_Base.nsp"
+          curl --fail --location --retry 3 "$UPDATE_URL" --output "$GAME_DIR/Sonic_Superstars_Update.nsp"
+          curl --fail --location --retry 3 "$KEYS_URL" --output "$RUNNER_TEMP/prod.keys"
 
           test -s "$GAME_DIR/Sonic_Superstars_Base.nsp"
           test -s "$GAME_DIR/Sonic_Superstars_Update.nsp"
@@ -75,7 +74,11 @@ jobs:
           DM_NO_BC_ASTC: all
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/nx-venv/bin/python" scripts/build_ipa_from_nsp.py             "$RUNNER_TEMP/sonic-superstars"             -k "$RUNNER_TEMP/prod.keys"             --allow-other-metal             -o "$RUNNER_TEMP/Sonic-Superstars-unsigned.ipa"
+          "$RUNNER_TEMP/nx-venv/bin/python" scripts/build_ipa_from_nsp.py \
+            "$RUNNER_TEMP/sonic-superstars" \
+            -k "$RUNNER_TEMP/prod.keys" \
+            --allow-other-metal \
+            -o "$RUNNER_TEMP/Sonic-Superstars-unsigned.ipa"
 
       - name: Upload unsigned IPA and build diagnostics
         if: always()
